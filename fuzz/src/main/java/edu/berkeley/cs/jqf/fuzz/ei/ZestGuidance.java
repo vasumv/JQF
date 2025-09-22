@@ -216,6 +216,9 @@ public class ZestGuidance implements Guidance {
     /** Whether to store all generated inputs to disk (can get slowww!) */
     protected final boolean LOG_ALL_INPUTS = Boolean.getBoolean("jqf.ei.LOG_ALL_INPUTS");
 
+    /** Controls whether to update the .cur_input file with the most recently generated input (disabling improves performance). Defaults to true. */
+    protected final boolean LOG_CURRENT_INPUT = Boolean.parseBoolean(System.getProperty("jqf.ei.LOG_CURRENT_INPUT", "true"));
+
     // ------------- TIMEOUT HANDLING ------------
 
     /** Timeout for an individual run. */
@@ -710,10 +713,12 @@ public class ZestGuidance implements Guidance {
                 currentInput = parent.fuzz(random);
                 numChildrenGeneratedForCurrentParentInput++;
 
-                // Write it to disk for debugging
-                try {
-                    writeCurrentInputToFile(currentInputFile);
-                } catch (IOException ignore) {
+                // Write current input to disk for debugging
+                if (LOG_CURRENT_INPUT) {
+                    try {
+                        writeCurrentInputToFile(currentInputFile);
+                    } catch (IOException ignore) {
+                    }
                 }
 
                 // Start time-counting for timeout handling

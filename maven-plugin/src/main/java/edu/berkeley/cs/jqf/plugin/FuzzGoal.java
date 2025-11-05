@@ -44,6 +44,8 @@ import edu.berkeley.cs.jqf.fuzz.ei.ZestGuidance;
 import edu.berkeley.cs.jqf.fuzz.guidance.Guidance;
 import edu.berkeley.cs.jqf.fuzz.guidance.GuidanceException;
 import edu.berkeley.cs.jqf.fuzz.junit.GuidedFuzzing;
+import edu.berkeley.cs.jqf.fuzz.predicates.PredicateTarget;
+import edu.berkeley.cs.jqf.fuzz.predicates.PredicateTrackingGuidance;
 import edu.berkeley.cs.jqf.instrument.InstrumentingClassLoader;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.AbstractMojo;
@@ -182,7 +184,10 @@ public class FuzzGoal extends AbstractMojo {
     /**
      * The fuzzing engine.
      *
-     * <p>One of 'zest' and 'zeal'. Default is 'zest'.</p>
+     * <p>One of 'zest', 'zeal', and 'zest-predicates'. Default is 'zest'.</p>
+     *
+     * <p>The 'zest-predicates' engine requires the {@code predicates} parameter
+     * to be set to a valid predicate JSON file from static analysis.</p>
      */
     @Parameter(property="engine", defaultValue="zest")
     private String engine;
@@ -243,6 +248,16 @@ public class FuzzGoal extends AbstractMojo {
      */
     @Parameter(property="libFuzzerCompatOutput")
     private String libFuzzerCompatOutput;
+
+    /**
+     * Path to predicate dominance JSON file from static analysis.
+     *
+     * <p>If provided, the fuzzer will track line coverage for predicates
+     * and their branches specified in the JSON file. Results will be written
+     * to the output directory.</p>
+     */
+    @Parameter(property="predicates")
+    private File predicatesFile;
 
     /**
      * Whether to avoid printing fuzzing statistics progress in the console.
@@ -422,10 +437,23 @@ public class FuzzGoal extends AbstractMojo {
             case "zeal":
                 System.setProperty("jqf.tracing.TRACE_GENERATORS", "true");
                 System.setProperty("jqf.tracing.MATCH_CALLEE_NAMES", "true");
-                ExecutionIndexingGuidance zeal = 
+                ExecutionIndexingGuidance zeal =
                     new ExecutionIndexingGuidance(targetName, duration, trials, resultsDir, seedsDir, rnd);
                 zeal.setBlind(blind);
                 return zeal;
+            case "zest-predicates":
+                if (predicatesFile == null || !predicatesFile.exists()) {
+                    throw new IllegalArgumentException("zest-predicates engine requires a valid predicates file. " +
+                            "Use -Dpredicates=path/to/predicates.json");
+                }
+                List<PredicateTarget> predicateTargets = PredicateTarget.fromJson(predicatesFile.getPath());
+                String lineCoverageOutputPath = new File(resultsDir, "line-coverage.json").getPath();
+
+                PredicateTrackingGuidance predGuidance = new PredicateTrackingGuidance(
+                    targetName, duration, trials, resultsDir, seedsDir, rnd,
+                    predicateTargets, lineCoverageOutputPath);
+                predGuidance.setBlind(blind);
+                return predGuidance;
             default:
                 throw new IllegalArgumentException("Unknown fuzzing engine: " + engine);
         }

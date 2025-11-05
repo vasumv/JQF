@@ -43,15 +43,6 @@ public class LineCoverage implements TraceEventVisitor {
             for (PredicateTarget.BranchTarget branch : pred.getBranches()) {
                 trackedLines.add(new LineLocation(branch.getClassName(), branch.getLine()));
             }
-
-            // Debug logging for TreeSingleSourcePathsImpl line 135
-            if (pred.getClassName().equals("org.jgrapht.alg.shortestpath.TreeSingleSourcePathsImpl") &&
-                pred.getPredicateLine() == 135) {
-                System.err.println("[DEBUG] Tracking predicate at " + pred.getClassName() + ":" + pred.getPredicateLine());
-                for (PredicateTarget.BranchTarget branch : pred.getBranches()) {
-                    System.err.println("[DEBUG]   Branch at " + branch.getClassName() + ":" + branch.getLine());
-                }
-            }
         }
     }
 
@@ -76,46 +67,38 @@ public class LineCoverage implements TraceEventVisitor {
 
     @Override
     public void visitBranchEvent(BranchEvent event) {
-        recordLineHit(event);
+        recordLineHit(event, "BranchEvent");
     }
 
     @Override
     public void visitCallEvent(CallEvent event) {
-        recordLineHit(event);
+        recordLineHit(event, "CallEvent");
     }
 
     @Override
     public void visitAllocEvent(AllocEvent event) {
-        recordLineHit(event);
+        recordLineHit(event, "AllocEvent");
     }
 
     @Override
     public void visitReadEvent(ReadEvent event) {
-        recordLineHit(event);
+        recordLineHit(event, "ReadEvent");
     }
 
     @Override
     public void visitReturnEvent(ReturnEvent event) {
-        recordLineHit(event);
+        recordLineHit(event, "ReturnEvent");
     }
 
     /**
      * Records that the current input hit a specific line.
      */
-    private void recordLineHit(TraceEvent event) {
+    private void recordLineHit(TraceEvent event, String eventType) {
         String className = event.getContainingClass();
         int lineNumber = event.getLineNumber();
 
         // Convert to dot format for consistency
         String classNameDot = className.replace("/", ".");
-
-        // Debug logging for TreeSingleSourcePathsImpl - show ALL events to understand line mappings
-        if (classNameDot.equals("org.jgrapht.alg.shortestpath.TreeSingleSourcePathsImpl") && currentInputId <= 5) {
-            System.err.println("[DEBUG] Event: " + event.getClass().getSimpleName() +
-                             " at " + classNameDot + ":" + lineNumber +
-                             " inputId=" + currentInputId +
-                             " tracked=" + isTrackedLine(classNameDot, lineNumber));
-        }
 
         // Only track if this line is in our targets
         if (lineNumber > 0 && isTrackedLine(classNameDot, lineNumber)) {

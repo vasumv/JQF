@@ -159,6 +159,58 @@ public class PredicateTrackingGuidance extends ZestGuidance {
                         branch.getLine(), branchCount, branchPercentage, branch.getDominance());
                 }
             }
+
+            // Collect all branches with their coverage info
+            java.util.List<BranchInfo> uncoveredBranches = new java.util.ArrayList<>();
+            for (PredicateTarget pred : predicateTargets) {
+                int predCount = lineCoverage.getInputCount(pred.getClassName(), pred.getPredicateLine());
+                // Only consider branches where the predicate has been hit
+                if (predCount > 0) {
+                    for (PredicateTarget.BranchTarget branch : pred.getBranches()) {
+                        int branchCount = lineCoverage.getInputCount(branch.getClassName(), branch.getLine());
+                        double branchPercentage = (predCount > 0) ? (100.0 * branchCount / predCount) : 0.0;
+                        uncoveredBranches.add(new BranchInfo(pred, branch, predCount, branchCount, branchPercentage));
+                    }
+                }
+            }
+
+            // Sort by dominance (descending), then by coverage percentage (ascending)
+            // This prioritizes high-dominance branches that are least covered
+            uncoveredBranches.sort((a, b) -> {
+                int domCompare = Integer.compare(b.branch.getDominance(), a.branch.getDominance());
+                if (domCompare != 0) return domCompare;
+                return Double.compare(a.branchPercentage, b.branchPercentage);
+            });
+
+            // Show top 5 most important under-covered branches
+            if (!uncoveredBranches.isEmpty()) {
+                console.printf("\nTop under-covered branches (sorted by dominance, then by %% coverage):\n");
+                int uncoveredDisplayCount = Math.min(5, uncoveredBranches.size());
+                for (int i = 0; i < uncoveredDisplayCount; i++) {
+                    BranchInfo info = uncoveredBranches.get(i);
+                    console.printf("  %s:%d -> line %d [dom: %d, %.1f%% coverage]\n",
+                        info.predicate.getClassName(), info.predicate.getPredicateLine(),
+                        info.branch.getLine(), info.branch.getDominance(), info.branchPercentage);
+                }
+            }
+        }
+    }
+
+    // Helper class to hold predicate+branch info for sorting
+    private static class BranchInfo {
+        final PredicateTarget predicate;
+        final PredicateTarget.BranchTarget branch;
+        final int predicateCount;
+        final int branchCount;
+        final double branchPercentage;
+
+        BranchInfo(PredicateTarget predicate, PredicateTarget.BranchTarget branch,
+                   int predicateCount, int branchCount, double branchPercentage) {
+            this.predicate = predicate;
+            this.branch = branch;
+            this.predicateCount = predicateCount;
+            this.branchCount = branchCount;
+            this.branchPercentage = branchPercentage;
         }
     }
 

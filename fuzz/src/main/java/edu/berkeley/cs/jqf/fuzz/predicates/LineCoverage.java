@@ -3,6 +3,7 @@ package edu.berkeley.cs.jqf.fuzz.predicates;
 import edu.berkeley.cs.jqf.instrument.tracing.events.AllocEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent;
+import edu.berkeley.cs.jqf.instrument.tracing.events.LineEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReadEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
@@ -34,6 +35,9 @@ public class LineCoverage implements TraceEventVisitor {
         this.lineInputSets = new HashMap<>();
         this.trackedLines = new HashSet<>();
 
+        System.err.println("=== LineCoverage Constructor Called ===");
+        System.err.println("Number of predicate targets: " + predicateTargets.size());
+
         // Extract all lines to track from predicate targets
         for (PredicateTarget pred : predicateTargets) {
             // Track the predicate line itself
@@ -44,6 +48,10 @@ public class LineCoverage implements TraceEventVisitor {
                 trackedLines.add(new LineLocation(branch.getClassName(), branch.getLine()));
             }
         }
+
+        System.err.println("Total tracked lines: " + trackedLines.size());
+        System.err.println("Sample tracked lines: " +
+            trackedLines.stream().limit(5).map(Object::toString).reduce((a,b) -> a + ", " + b).orElse("none"));
     }
 
     /**
@@ -90,6 +98,11 @@ public class LineCoverage implements TraceEventVisitor {
         recordLineHit(event, "ReturnEvent");
     }
 
+    @Override
+    public void visitLineEvent(LineEvent event) {
+        recordLineHit(event, "LineEvent");
+    }
+
     /**
      * Records that the current input hit a specific line.
      */
@@ -108,6 +121,8 @@ public class LineCoverage implements TraceEventVisitor {
                 .add(currentInputId);
         }
     }
+
+    private int debugEventCount = 0;
 
     /**
      * Checks if a line should be tracked.

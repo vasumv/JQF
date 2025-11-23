@@ -1028,6 +1028,11 @@ public final class SingleSnoop {
         try { intp.MAKE_SYMBOLIC(); } finally { block.set(false); }
     }
 
+    public static void LINE(int iid, int lineNumber) {
+        if (block.get()) return; else block.set(true);
+        try { intp.LINE(iid, lineNumber); } finally { block.set(false); }
+    }
+
     public static void flush() {
         intp.flush();
     }

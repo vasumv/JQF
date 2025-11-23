@@ -926,6 +926,11 @@ public class DefaultInstructionVisitor implements IVisitor {
     }
 
     @Override
+    public void visitLINE(LINE inst) {
+
+    }
+
+    @Override
     public void setNext(Instruction next) {
 
     }

@@ -297,10 +297,19 @@ public class ReproGuidance implements Guidance {
      * @param thread the thread whose events to handle
      * @return a callback to log code coverage or execution traces
      */
+    private static int debugEventCount = 0;
+
     @Override
     public Consumer<TraceEvent> generateCallBack(Thread thread) {
         if (branchesCoveredInCurrentRun != null) {
             return (e) -> {
+                // Debug: Print first 100 events
+                if (debugEventCount < 100) {
+                    debugEventCount++;
+                    String className = e.getContainingClass().replace("/", ".");
+                    System.err.println("REPRO Event #" + debugEventCount + ": class=" + className + " line=" + e.getLineNumber());
+                }
+
                 coverage.handleEvent(e);
                 if (e instanceof BranchEvent) {
                     BranchEvent b = (BranchEvent) e;
@@ -331,6 +340,13 @@ public class ReproGuidance implements Guidance {
 
                 // Return an event logging callback
                 return (e) -> {
+                    // Debug: Print first 100 events
+                    if (debugEventCount < 100) {
+                        debugEventCount++;
+                        String className = e.getContainingClass().replace("/", ".");
+                        System.err.println("REPRO Event #" + debugEventCount + ": class=" + className + " line=" + e.getLineNumber());
+                    }
+
                     coverage.handleEvent(e);
                     out.println(e);
                 };
@@ -341,7 +357,15 @@ public class ReproGuidance implements Guidance {
         }
 
         // If none of the above work, just update coverage
-        return coverage::handleEvent;
+        return (e) -> {
+            // Debug: Print first 100 events
+            if (debugEventCount < 100) {
+                debugEventCount++;
+                String className = e.getContainingClass().replace("/", ".");
+                System.err.println("REPRO Event #" + debugEventCount + ": class=" + className + " line=" + e.getLineNumber());
+            }
+            coverage.handleEvent(e);
+        };
 
     }
 

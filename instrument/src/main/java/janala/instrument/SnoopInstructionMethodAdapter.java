@@ -961,10 +961,20 @@ public class SnoopInstructionMethodAdapter extends MethodVisitor implements Opco
   }*/
 
   private Integer lastLineNumber = 0;
+  private Integer previousEmittedLine = 0;
 
   @Override
   public void visitLineNumber(int lineNumber, Label label) {
     lastLineNumber = lineNumber;
+
+    // Emit LINE instruction when we transition to a new line
+    if (lineNumber != previousEmittedLine && lineNumber > 0) {
+      previousEmittedLine = lineNumber;
+      addBipushInsn(mv, instrumentationState.incAndGetId());
+      addBipushInsn(mv, lineNumber);
+      mv.visitMethodInsn(INVOKESTATIC, Config.instance.analysisClass, "LINE", "(II)V", false);
+    }
+
     super.visitLineNumber(lineNumber, label);
   }
 

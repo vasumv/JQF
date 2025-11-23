@@ -357,5 +357,7 @@ public interface IVisitor {
 
   public void visitSPECIAL(SPECIAL inst);
 
+  public void visitLINE(LINE inst);
+
   public void setNext(Instruction next);
 }

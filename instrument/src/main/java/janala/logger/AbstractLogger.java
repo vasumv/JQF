@@ -720,6 +720,10 @@ public abstract class AbstractLogger implements Logger {
     log(new SPECIAL(i));
   }
 
+  public void LINE(int iid, int lineNumber) {
+    log(new LINE(iid, lineNumber));
+  }
+
   public void flush() {
     log(null);
   }

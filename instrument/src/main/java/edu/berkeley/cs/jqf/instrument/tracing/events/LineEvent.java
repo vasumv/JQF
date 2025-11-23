@@ -28,22 +28,24 @@
  */
 package edu.berkeley.cs.jqf.instrument.tracing.events;
 
+import janala.logger.inst.MemberRef;
+
 /**
- * Visitor class for {@code TraceEvent} instances.
- *
- * @author Rohan Padhye
+ * Represents a line execution event.
+ * This event is emitted whenever execution transitions to a new source line.
  */
-public interface TraceEventVisitor {
+public class LineEvent extends TraceEvent {
+    public LineEvent(int iid, MemberRef containingMethod, int lineNumber) {
+        super(iid, containingMethod, lineNumber);
+    }
 
-    default void visitAllocEvent(AllocEvent e) {}
+    @Override
+    public String toString() {
+        return String.format("LINE(%d,%d)", iid, lineNumber);
+    }
 
-    default void visitBranchEvent(BranchEvent e) {}
-
-    default void visitCallEvent(CallEvent e) {}
-
-    default void visitReadEvent(ReadEvent e) {}
-
-    default void visitReturnEvent(ReturnEvent e) {}
-
-    default void visitLineEvent(LineEvent e) {}
+    @Override
+    public void applyVisitor(TraceEventVisitor v) {
+        v.visitLineEvent(this);
+    }
 }

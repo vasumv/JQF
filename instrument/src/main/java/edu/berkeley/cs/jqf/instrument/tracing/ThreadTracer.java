@@ -38,6 +38,7 @@ import edu.berkeley.cs.jqf.instrument.InstrumentationException;
 import edu.berkeley.cs.jqf.instrument.tracing.events.AllocEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.BranchEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.CallEvent;
+import edu.berkeley.cs.jqf.instrument.tracing.events.LineEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReadEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.ReturnEvent;
 import edu.berkeley.cs.jqf.instrument.tracing.events.TraceEvent;
@@ -332,6 +333,7 @@ public class ThreadTracer {
         public void visitConditionalBranch(Instruction ins) {
             int iid = ins.iid;
             int lineNum = ins.mid;
+
             // The branch taken-or-not would have been set by a previous
             // GETVALUE instruction
             boolean taken = values.booleanValue;
@@ -416,6 +418,15 @@ public class ThreadTracer {
             handlers.pop();
 
             super.visitReturnOrMethodThrow(ins);
+        }
+
+        @Override
+        public void visitLINE(LINE line) {
+            int iid = line.iid;
+            int lineNum = line.mid;
+            emit(new LineEvent(iid, this.method, lineNum));
+
+            super.visitLINE(line);
         }
 
     }

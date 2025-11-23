@@ -1042,8 +1042,17 @@ public class ZestGuidance implements Guidance {
      *
      * @param e the trace event to be handled
      */
+    private static int debugEventCount = 0;
+
     protected void handleEvent(TraceEvent e) {
         conditionallySynchronize(multiThreaded, () -> {
+            // Debug: Print first 100 events to see what's being tracked
+            if (false) {
+                debugEventCount++;
+                String className = e.getContainingClass().replace("/", ".");
+                System.err.println("ZEST Event #" + debugEventCount + ": class=" + className + " line=" + e.getLineNumber());
+            }
+
             // Collect totalCoverage
             ((Coverage) runCoverage).handleEvent(e);
             // Check for possible timeouts every so often

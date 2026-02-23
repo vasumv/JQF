@@ -10,11 +10,16 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 
 /**
@@ -229,10 +234,106 @@ public class PredicateTrackingGuidance extends ZestGuidance {
     }
 
     /**
+     * Formats a sorted list of integers as compact ranges.
+     * e.g. [1,2,3,5,10,11] -> "1-3, 5, 10-11"
+     */
+    private String formatRanges(List<Integer> sortedLines) {
+        if (sortedLines.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        int rangeStart = sortedLines.get(0);
+        int prev = rangeStart;
+        for (int i = 1; i < sortedLines.size(); i++) {
+            int cur = sortedLines.get(i);
+            if (cur == prev + 1) {
+                prev = cur;
+            } else {
+                if (sb.length() > 0) sb.append(", ");
+                if (prev == rangeStart) sb.append(rangeStart);
+                else sb.append(rangeStart).append("-").append(prev);
+                rangeStart = cur;
+                prev = cur;
+            }
+        }
+        if (sb.length() > 0) sb.append(", ");
+        if (prev == rangeStart) sb.append(rangeStart);
+        else sb.append(rangeStart).append("-").append(prev);
+        return sb.toString();
+    }
+
+    /**
+     * Builds per-class coverage summary: maps className -> (allLines, coveredLines).
+     */
+    private Map<String, Object[]> buildClassCoverageMap() {
+        // Use TreeMap for stable alphabetical ordering
+        Map<String, Set<Integer>> allLinesPerClass = new TreeMap<>();
+        Map<String, Set<Integer>> coveredLinesPerClass = new TreeMap<>();
+
+        for (PredicateTarget pred : predicateTargets) {
+            // Collect predicate line
+            String cls = pred.getClassName();
+            allLinesPerClass.computeIfAbsent(cls, k -> new HashSet<>()).add(pred.getPredicateLine());
+            int predCount = lineCoverage.getInputCount(cls, pred.getPredicateLine());
+            if (predCount > 0) {
+                coveredLinesPerClass.computeIfAbsent(cls, k -> new HashSet<>()).add(pred.getPredicateLine());
+            }
+            // Collect branch lines
+            for (PredicateTarget.BranchTarget branch : pred.getBranches()) {
+                String bCls = branch.getClassName();
+                allLinesPerClass.computeIfAbsent(bCls, k -> new HashSet<>()).add(branch.getLine());
+                int bCount = lineCoverage.getInputCount(bCls, branch.getLine());
+                if (bCount > 0) {
+                    coveredLinesPerClass.computeIfAbsent(bCls, k -> new HashSet<>()).add(branch.getLine());
+                }
+            }
+        }
+
+        // Result: className -> [Set<Integer> allLines, Set<Integer> coveredLines]
+        Map<String, Object[]> result = new TreeMap<>();
+        for (String cls : allLinesPerClass.keySet()) {
+            Set<Integer> all = allLinesPerClass.get(cls);
+            Set<Integer> covered = coveredLinesPerClass.getOrDefault(cls, new HashSet<>());
+            result.put(cls, new Object[]{all, covered});
+        }
+        return result;
+    }
+
+    /**
+     * Prints a compact coverage summary grouped by class.
+     */
+    private void printCoarseGrainedCoverage() {
+        System.out.println("=== COVERAGE SUMMARY (tracked predicate lines) ===");
+        Map<String, Object[]> classMap = buildClassCoverageMap();
+        for (Map.Entry<String, Object[]> entry : classMap.entrySet()) {
+            String cls = entry.getKey();
+            @SuppressWarnings("unchecked")
+            Set<Integer> allLines = (Set<Integer>) entry.getValue()[0];
+            @SuppressWarnings("unchecked")
+            Set<Integer> coveredLines = (Set<Integer>) entry.getValue()[1];
+
+            Set<Integer> uncoveredLines = new HashSet<>(allLines);
+            uncoveredLines.removeAll(coveredLines);
+
+            List<Integer> sortedCovered = new ArrayList<>(coveredLines);
+            List<Integer> sortedUncovered = new ArrayList<>(uncoveredLines);
+            Collections.sort(sortedCovered);
+            Collections.sort(sortedUncovered);
+
+            int total = allLines.size();
+            int coveredCount = coveredLines.size();
+
+            System.out.println(cls);
+            System.out.printf("  Covered   (%d/%d): %s%n", coveredCount, total, formatRanges(sortedCovered));
+            System.out.printf("  Uncovered  (%d/%d): %s%n", total - coveredCount, total, formatRanges(sortedUncovered));
+        }
+        System.out.println();
+    }
+
+    /**
      * Prints line coverage statistics to stdout.
      */
     private void printLineCoverageStats() {
         System.out.println();
+        printCoarseGrainedCoverage();
         System.out.println("=== LINE COVERAGE STATISTICS ===");
         System.out.println("Total inputs generated: " + inputCounter);
         System.out.println();
@@ -304,6 +405,34 @@ public class PredicateTrackingGuidance extends ZestGuidance {
         }
 
         output.put("lineCoverage", lineCoverageData);
+
+        // Build coverage summary
+        Map<String, Object[]> classMap = buildClassCoverageMap();
+        List<Map<String, Object>> coverageSummary = new ArrayList<>();
+        for (Map.Entry<String, Object[]> entry : classMap.entrySet()) {
+            String cls = entry.getKey();
+            @SuppressWarnings("unchecked")
+            Set<Integer> allLines = (Set<Integer>) entry.getValue()[0];
+            @SuppressWarnings("unchecked")
+            Set<Integer> coveredLines = (Set<Integer>) entry.getValue()[1];
+
+            Set<Integer> uncoveredLines = new HashSet<>(allLines);
+            uncoveredLines.removeAll(coveredLines);
+
+            List<Integer> sortedCovered = new ArrayList<>(coveredLines);
+            List<Integer> sortedUncovered = new ArrayList<>(uncoveredLines);
+            Collections.sort(sortedCovered);
+            Collections.sort(sortedUncovered);
+
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("class", cls);
+            summary.put("coveredLines", formatRanges(sortedCovered));
+            summary.put("uncoveredLines", formatRanges(sortedUncovered));
+            summary.put("coveredCount", coveredLines.size());
+            summary.put("totalTracked", allLines.size());
+            coverageSummary.add(summary);
+        }
+        output.put("coverageSummary", coverageSummary);
 
         // Write JSON
         ObjectMapper mapper = new ObjectMapper();
